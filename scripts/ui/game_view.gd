@@ -418,7 +418,7 @@ func _show_request(r: Dictionary) -> void:
 		"start_cards":
 			_ui_start_cards(r)
 		"buy":
-			_ui_cards(r["options"], "CARTA RICERCA", "Hai %d punti Ricerca: puoi acquisire una carta (il segnalino torna alla prima casella). Puoi anche aspettare." % int(D.RIC_POINTS[int(eng.S["ric"])]), "NON ORA", -1)
+			_ui_cards(r["options"], "CARTA RICERCA", "Hai %s: puoi acquisire una carta di quel valore o inferiore (poi il segnalino torna alla partenza), oppure aspettare. Passa il mouse su una carta per leggerla." % ("1 punto Ricerca" if int(D.RIC_POINTS[int(eng.S["ric"])]) == 1 else "%d punti Ricerca" % int(D.RIC_POINTS[int(eng.S["ric"])])), "NON ORA", -1)
 		"free_card":
 			_ui_cards(r["options"], "CARTA RICERCA GRATIS", "La tessera ti regala una carta Ricerca di valore 1: scegli quale.", "", -1)
 		"deny_card":
@@ -689,6 +689,10 @@ func _ui_event(r: Dictionary) -> void:
 
 func _ui_cards(opts: Array, title: String, text: String, no_label: String, _x) -> void:
 	_act(title, text)
+	if no_label != "":
+		var n := UI.button(no_label, 220, 46, 18)
+		n.pressed.connect(func(): _send(-1))
+		act_body.add_child(n)
 	var fl := HFlowContainer.new()
 	fl.add_theme_constant_override("h_separation", 10)
 	fl.add_theme_constant_override("v_separation", 10)
@@ -702,10 +706,6 @@ func _ui_cards(opts: Array, title: String, text: String, no_label: String, _x) -
 		b.tooltip_text = "%s (valore %d, costo %d)\n%s" % [D.CARDS[c]["name"], int(D.CARDS[c]["lvl"]), eng.card_cost(int(c)), D.CARDS[c]["text"]]
 		b.pressed.connect(func(): _send(int(c)))
 		fl.add_child(b)
-	if no_label != "":
-		var n := UI.button(no_label, 220, 50, 19)
-		n.pressed.connect(func(): _send(-1))
-		act_body.add_child(n)
 
 
 func _ui_start_cards(r: Dictionary) -> void:

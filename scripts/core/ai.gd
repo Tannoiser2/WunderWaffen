@@ -13,6 +13,17 @@ const GER := 0
 var level := 1
 var rng := RandomNumberGenerator.new()
 
+## pesi della valutazione (regolabili con tests/tune.gd)
+const BASE_W := {"pres1": 0.35, "pres2": 0.8, "deny": 1.1, "mor1": 1.4, "mor2": 0.7, "eve": 0.1,
+	"ger_terr1": 1.6, "ger_terr2": 0.9, "ric": 1.3, "rivals": 0.7, "ally_rivals": 0.25, "vs_ger": 1.2, "pawns": 0.45, "mob": 1.0, "berlin_ring": 2.5, "ger_pres1": 0.15, "ger_pres2": 0.45}
+var W := BASE_W.duplicate()
+
+
+func set_weights(over: Dictionary) -> void:
+	W = BASE_W.duplicate()
+	for k in over:
+		W[k] = over[k]
+
 const CARD_VALUE := {"v1": 4.0, "jet": 3.0, "rfin": 2.0, "acqua": 2.5, "gen": 2.0, "ala": 3.5, "mecc": 3.0, "sci": 3.5,
 	"prop": 4.0, "rorg": 2.0, "carri": 2.5, "uboot": 5.5, "v2": 4.5, "spie": 3.0, "uranio": 5.0, "braun": 4.0,
 	"difesa": 0.0, "strat": 6.0, "atomica": 6.0, "v3": 6.0, "enigma": 4.0, "econ": 6.0, "gustav": 7.5, "visita": 5.0}
@@ -34,8 +45,8 @@ func est(e: WWEngine, f: int) -> float:
 	var v := float(S["pv"][f])
 	var terr := e.controlled(f)
 	if f == GER:
-		v += terr * (1.6 if part1 else 0.9)
-		v += float(S["ric"]) * 1.3 + float(D.RIC_POINTS[int(S["ric"])]) * 0.8
+		v += terr * (float(W["ger_terr1"]) if part1 else float(W["ger_terr2"]))
+		v += float(S["ric"]) * float(W["ric"]) + float(D.RIC_POINTS[int(S["ric"])]) * 0.8
 		var rockets := 0
 		var atomc := 0
 		for c in S["cards"]:
@@ -61,8 +72,22 @@ func est(e: WWEngine, f: int) -> float:
 		v += terr
 		if part1:
 			v += S["tiles"][f].size()
-		v += float(S["mor"][f]) * (1.4 if part1 else 0.7)
-		v += float(S["eve"][f]) * 0.35
+		v += float(S["mor"][f]) * (float(W["mor1"]) if part1 else float(W["mor2"]))
+		v += float(S["eve"][f]) * float(W["eve"])
+		# libertà di manovra: territori dove si può ancora giocare (le Fortezze forti chiudono il fronte)
+		var mob := 0.0
+		for t in D.T_KEY.size():
+			if t == D.BERLIN:
+				continue
+			var T: Dictionary = S["terr"][t]
+			if T["al"] or not e.access(f, t):
+				continue
+			if T["fort"] and T["cp"] != null:
+				mob += 0.4 if int(T["cp"]["s"]) <= 3 else 0.15
+			else:
+				mob += 1.0
+		v += minf(mob, 6.0) * float(W["mob"]) * (1.0 if part1 else 0.6)
+		v += float(e.allied_around_berlin()) * float(W["berlin_ring"])
 	# Politica: 10 PV a chi è in testa alla fine
 	var rank := [0, 1, 2, 3]
 	rank.sort_custom(func(a, b): return e._pol_better(a, b))
@@ -111,9 +136,10 @@ func est(e: WWEngine, f: int) -> float:
 			continue
 		var tv := _terr_value(e, t, f)
 		if f == GER:
-			v += tv * (0.45 if mine >= 2 else 0.15) * (1.0 if others == 0 else 0.6)
+			v += tv * (float(W["ger_pres2"]) if mine >= 2 else float(W["ger_pres1"])) * (1.0 if others == 0 else 0.6)
 		else:
-			var p := 0.22 if mine == 1 else 0.55
+			tv += float(W["deny"]) * (2.0 if part1 else 1.0)
+			var p := float(W["pres1"]) if mine == 1 else float(W["pres2"])
 			if ger > 0:
 				p *= 0.55
 			if others > 0:
@@ -125,7 +151,7 @@ func est(e: WWEngine, f: int) -> float:
 				p *= 0.6
 			v += tv * p
 	# pedine ancora da giocare
-	v += 0.45 * float(S["start"][f].size() + e.reserve(f).size())
+	v += float(W["pawns"]) * float(S["start"][f].size() + e.reserve(f).size())
 	return v
 
 
@@ -142,13 +168,20 @@ func utility(e: WWEngine, f: int) -> float:
 	var me := est(e, f)
 	var best := -1e9
 	var sum := 0.0
+	var ger := 0.0
 	for g in 4:
 		if g == f:
 			continue
 		var x := est(e, g)
 		sum += x
-		best = maxf(best, x)
-	return me - 0.7 * best - 0.1 * sum
+		if g == GER:
+			ger = x
+		else:
+			best = maxf(best, x)
+	if f == GER:
+		return me - float(W["rivals"]) * best - 0.1 * sum
+	# gli Alleati sono rivali fra loro, ma il nemico comune è il tedesco
+	return me - float(W["ally_rivals"]) * best - float(W["vs_ger"]) * ger - 0.05 * sum
 
 
 ## Quanto vale conquistare il territorio t per f (tessera, PV del Morale, punto territorio).
