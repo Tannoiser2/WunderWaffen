@@ -1,0 +1,10 @@
+{
+  "titolo": "WunderWaffen",
+  "sottotitolo": "1944-45, la corsa verso Berlino",
+  "descrizione": "Tre Alleati in gara verso Berlino, la Germania a caccia delle armi miracolose: pedine a doppia faccia, Eventi, Conferenza e Fortezze, contro l'IA o online.",
+  "online": true,
+  "sezione": "conversione",
+  "ordine": 181,
+  "generi": ["Wargame", "Storici"],
+  "bgg": 439684
+}
