@@ -279,28 +279,46 @@ func _badge(pos: Vector2, text: String, col: Color) -> void:
 
 
 func _track(vals: Array, stamps: Array, pos: Array, kind: String) -> void:
+	# segnalini grandi quasi quanto la casella; se sono più d'uno si sfalsano a scaletta
+	# (l'ultimo arrivato sta sopra, come nel gioco da tavolo)
 	var order := [0, 1, 2, 3]
 	order.sort_custom(func(a, b): return int(stamps[a]) < int(stamps[b]))
-	var count := {}
+	var groups := {}
 	for f in order:
 		var v := int(vals[f])
-		var k := int(count.get(v, 0))
-		count[v] = k + 1
+		if not groups.has(v):
+			groups[v] = []
+		groups[v].append(f)
+	for v in groups:
+		var g: Array = groups[v]
 		var r := _px(pos[v])
-		var s := r.size * 0.62
-		var p := r.position + Vector2(r.size.x * 0.08 + k * 5.0, r.size.y * 0.30 - k * 5.0)
-		draw_rect(Rect2(p + Vector2(1, 2), s), Color(0, 0, 0, 0.35), true)
-		draw_texture_rect(UI.marker(f, kind), Rect2(p, s), false)
+		var n := g.size()
+		var step := r.size.x * 0.16
+		var s := r.size * (0.92 if n == 1 else 0.84)
+		var base := r.get_center() - s * 0.5 - Vector2(step, -step) * 0.5 * float(n - 1)
+		for k in n:
+			var p := base + Vector2(step, -step) * float(k)
+			_marker(UI.marker(g[k], kind), Rect2(p, s))
+
+
+func _marker(t: Texture2D, r: Rect2) -> void:
+	draw_rect(Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.45), true)
+	draw_texture_rect(t, r, false)
 
 
 func _pv_track() -> void:
-	var count := {}
+	var groups := {}
 	for f in [0, 1, 2, 3]:
 		var v := int(eng.S["pv"][f]) % 76
-		var k := int(count.get(v, 0))
-		count[v] = k + 1
+		if not groups.has(v):
+			groups[v] = []
+		groups[v].append(f)
+	for v in groups:
+		var g: Array = groups[v]
 		var c: Vector2 = D.PV_POS[v] * B
-		var s := D.PV_CELL * B * 0.66
-		var p := c - Vector2(s, s) * 0.5 + Vector2(k * 4.0, -k * 4.0)
-		draw_rect(Rect2(p + Vector2(1, 2), Vector2(s, s)), Color(0, 0, 0, 0.35), true)
-		draw_texture_rect(UI.marker(f, "pv"), Rect2(p, Vector2(s, s)), false)
+		var n := g.size()
+		var sz := D.PV_CELL * B * (0.95 if n == 1 else 0.85)
+		var step := sz * 0.2
+		var base := c - Vector2(sz, sz) * 0.5 - Vector2(step, -step) * 0.5 * float(n - 1)
+		for k in n:
+			_marker(UI.marker(g[k], "pv"), Rect2(base + Vector2(step, -step) * float(k), Vector2(sz, sz)))
